@@ -417,6 +417,7 @@ class CloudifyContext(CommonContext):
         self._source = None
         self._target = None
         self._operation = OperationContext(self._context.get('operation', {}))
+        self._agent = CloudifyAgentContext(self)
 
         capabilities_node_instance = None
         if 'related' in self._context:
@@ -573,6 +574,11 @@ class CloudifyContext(CommonContext):
         The current operation context.
         """
         return self._operation
+
+    @property
+    def agent(self):
+        self._verify_in_node_context()
+        return self._agent
 
     @property
     def capabilities(self):
@@ -775,6 +781,33 @@ class OperationContext(object):
         self._operation_retry = exceptions.OperationRetry(
             message=message,
             retry_after=retry_after)
+
+
+class CloudifyAgentContext(object):
+
+    def __init__(self, context):
+        self.context = context
+
+    def init_script(self, cloudify_agent_rename=None):
+        if self._install_method() not in ['provided', 'init_script']:
+            return None
+        try:
+            from cloudify_agent.installer import script
+        except ImportError as e:
+            raise exceptions.NonRecoverableError(
+                'init_script cannot be used outside of an agent environment: '
+                'ImportError {0}'.format(e))
+        return script.init_script(cloudify_agent=cloudify_agent_rename)
+
+    def _install_method(self):
+        properties = self.context.node.properties
+        install_agent = properties.get('install_agent')
+        if install_agent is False:
+            return 'none'
+        elif install_agent is True:
+            return 'remote'
+        else:
+            return properties.get('agent_config', {}).get('install_method')
 
 
 class ImmutableProperties(dict):

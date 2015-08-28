@@ -281,8 +281,9 @@ def _wait_for_host_to_start(host_node_instance):
 
 
 def _host_post_start(host_node_instance):
+    install_method = _install_method(host_node_instance)
     tasks = [_wait_for_host_to_start(host_node_instance)]
-    if host_node_instance.node.properties['install_agent'] is True:
+    if install_method != 'none':
         node_operations = host_node_instance.node.operations
         if 'cloudify.interfaces.worker_installer.install' in node_operations:
             # 3.2 Compute Node
@@ -325,8 +326,7 @@ def _host_post_start(host_node_instance):
                     kwargs={'plugins': plugins_to_install})
                 ]
 
-            if host_node_instance.node.properties.get(
-                    'remote_execution') is False:
+            if install_method in ['provided', 'init_script']:
                 # this option is only available since 3.3 so no need to
                 # handle 3.2 version here.
                 tasks += [
@@ -359,6 +359,7 @@ def _host_post_start(host_node_instance):
 
 
 def _host_pre_stop(host_node_instance):
+    install_method = _install_method(host_node_instance)
     tasks = []
     tasks += [
         host_node_instance.execute_operation(
@@ -366,12 +367,12 @@ def _host_pre_stop(host_node_instance):
         host_node_instance.execute_operation(
             'cloudify.interfaces.monitoring_agent.uninstall'),
     ]
-    if host_node_instance.node.properties['install_agent'] is True:
-        if host_node_instance.node.properties.get('remote_execution') is False:
+    if install_method != 'none':
+        tasks.append(host_node_instance.send_event('Stopping agent'))
+        if install_method in ['provided', 'init_script']:
             # this option is only available since 3.3 so no need to
             # handle 3.2 version here.
             tasks += [
-                host_node_instance.send_event('Stopping agent'),
                 host_node_instance.execute_operation(
                     'cloudify.interfaces.cloudify_agent.stop_amqp'),
                 host_node_instance.send_event('Deleting agent'),
@@ -382,7 +383,6 @@ def _host_pre_stop(host_node_instance):
             node_operations = host_node_instance.node.operations
             if 'cloudify.interfaces.worker_installer.stop' in node_operations:
                 tasks += [
-                    host_node_instance.send_event('Stopping agent'),
                     host_node_instance.execute_operation(
                         'cloudify.interfaces.worker_installer.stop'),
                     host_node_instance.send_event('Deleting agent'),
@@ -391,7 +391,6 @@ def _host_pre_stop(host_node_instance):
                 ]
             else:
                 tasks += [
-                    host_node_instance.send_event('Stopping agent'),
                     host_node_instance.execute_operation(
                         'cloudify.interfaces.cloudify_agent.stop'),
                     host_node_instance.send_event('Deleting agent'),
@@ -399,3 +398,14 @@ def _host_pre_stop(host_node_instance):
                         'cloudify.interfaces.cloudify_agent.delete')
                 ]
     return tasks
+
+
+def _install_method(host_node_instance):
+    properties = host_node_instance.node.properties
+    install_agent = properties.get('install_agent')
+    if install_agent is False:
+        return 'none'
+    elif install_agent is True:
+        return 'remote'
+    else:
+        return properties.get('agent_config', {}).get('install_method')
