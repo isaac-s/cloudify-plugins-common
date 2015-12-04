@@ -22,7 +22,7 @@ from threading import Thread
 from StringIO import StringIO
 from functools import wraps
 
-from cloudify import context
+from cloudify import context, logs
 from cloudify.workflows.workflow_context import CloudifyWorkflowContext
 from cloudify.manager import update_execution_status, get_rest_client
 from cloudify.workflows import api
@@ -172,6 +172,13 @@ def operation(func=None, **arguments):
                 raise type(value), value, tb
 
             finally:
+                if hasattr(logs.clients, 'amqp_client'):
+                    amqp_client = logs.clients.amqp_client
+                    try:
+                        amqp_client.close()
+                        ctx.logger.info('AMQP connection closed')
+                    except BaseException as e:
+                        ctx.logger.error('Failed closing connection', exc_info=True)
                 current_ctx.clear()
                 if ctx.type == context.NODE_INSTANCE:
                     ctx.instance.update()
