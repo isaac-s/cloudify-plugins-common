@@ -18,6 +18,7 @@ import traceback
 import copy
 import sys
 import Queue
+import logging
 from threading import Thread
 from StringIO import StringIO
 from functools import wraps
@@ -180,20 +181,15 @@ def operation(func=None, **arguments):
                     ctx.target.instance.update()
                 if hasattr(logs.clients, 'amqp_client'):
                     amqp_client = logs.clients.amqp_client
-                    import tempfile
-                    import os
-                    temp_out_fd, temp_out_name = tempfile.mkstemp('conn-output')
                     try:
+                        logging.info('Closing connection')
                         amqp_client.close()
-                        os.write(temp_out_fd, 'Connection closed successfully')
-                    except BaseException as ex:
+                        logging.info('Connection closed successfully')
+                    except:
                         # Well... what can we do. We can't log using the ctx logger
                         # (as the amqp client may be at least partly down). We can't print
                         # because stdout goes nowhere (that I know of)...
-                        os.write(temp_out_fd, 'Connection failed closing: {}'.format(ex))
-                        pass
-                    finally:
-                        os.close(temp_out_fd)
+                        logging.exception('Failed closing connection')
             if ctx.operation._operation_retry:
                 raise ctx.operation._operation_retry
             return result
