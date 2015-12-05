@@ -179,16 +179,14 @@ def operation(func=None, **arguments):
                 elif ctx.type == context.RELATIONSHIP_INSTANCE:
                     ctx.source.instance.update()
                     ctx.target.instance.update()
+                # Delete the AMQP client, if it exists.
                 if hasattr(logs.clients, 'amqp_client'):
                     amqp_client = logs.clients.amqp_client
                     try:
-                        logging.info('Closing connection')
+                        logging.info('Closing connection...')
                         amqp_client.close()
                         logging.info('Connection closed successfully')
                     except:
-                        # Well... what can we do. We can't log using the ctx logger
-                        # (as the amqp client may be at least partly down). We can't print
-                        # because stdout goes nowhere (that I know of)...
                         logging.exception('Failed closing connection')
                     del logs.clients.amqp_client
             if ctx.operation._operation_retry:
