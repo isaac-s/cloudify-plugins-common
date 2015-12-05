@@ -190,6 +190,7 @@ def operation(func=None, **arguments):
                         # (as the amqp client may be at least partly down). We can't print
                         # because stdout goes nowhere (that I know of)...
                         logging.exception('Failed closing connection')
+                    del logs.clients.amqp_client
             if ctx.operation._operation_retry:
                 raise ctx.operation._operation_retry
             return result
