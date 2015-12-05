@@ -172,19 +172,28 @@ def operation(func=None, **arguments):
                 raise type(value), value, tb
 
             finally:
-                if hasattr(logs.clients, 'amqp_client'):
-                    amqp_client = logs.clients.amqp_client
-                    try:
-                        amqp_client.close()
-                        ctx.logger.info('AMQP connection closed')
-                    except BaseException as e:
-                        ctx.logger.error('Failed closing connection', exc_info=True)
                 current_ctx.clear()
                 if ctx.type == context.NODE_INSTANCE:
                     ctx.instance.update()
                 elif ctx.type == context.RELATIONSHIP_INSTANCE:
                     ctx.source.instance.update()
                     ctx.target.instance.update()
+                if hasattr(logs.clients, 'amqp_client'):
+                    amqp_client = logs.clients.amqp_client
+                    import tempfile
+                    import os
+                    temp_out_fd, temp_out_name = tempfile.mkstemp('conn-output')
+                    try:
+                        amqp_client.close()
+                        os.write(temp_out_fd, 'Connection closed successfully')
+                    except BaseException as ex:
+                        # Well... what can we do. We can't log using the ctx logger
+                        # (as the amqp client may be at least partly down). We can't print
+                        # because stdout goes nowhere (that I know of)...
+                        os.write(temp_out_fd, 'Connection failed closing: {}'.format(ex))
+                        pass
+                    finally:
+                        os.close(temp_out_fd)
             if ctx.operation._operation_retry:
                 raise ctx.operation._operation_retry
             return result
