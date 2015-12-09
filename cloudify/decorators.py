@@ -47,6 +47,7 @@ CLOUDIFY_NODE_STATE_PROPERTY = 'node_state'
 CLOUDIFY_CONTEXT_PROPERTY_KEY = '__cloudify_context'
 CLOUDIFY_CONTEXT_IDENTIFIER = '__cloudify_context'
 
+logger = logging.getLogger(__name__)
 
 def _is_cloudify_context(obj):
     """
@@ -182,12 +183,25 @@ def operation(func=None, **arguments):
                 # Delete the AMQP client, if it exists.
                 if hasattr(logs.clients, 'amqp_client'):
                     amqp_client = logs.clients.amqp_client
+                    if ctx.type == context.NODE_INSTANCE:
+                        ctx_instances_desc = 'node-instance={}'.format(
+                            ctx.instance.id)
+                    elif ctx.type == context.RELATIONSHIP_INSTANCE:
+                        ctx_instances_desc = 'source-instance={}, target-instance={}'.format(
+                            ctx.source.instance.id,
+                            ctx.target.instance.id)
+                    else:
+                        ctx_instance_desc='<no instance information>'
+
+                    ctx_info = 'operation={}, {}'.format(
+                        ctx.operation.name, ctx_instance_desc)
+
                     try:
-                        logging.info('Closing connection...')
+                        logger.info('Closing AMQP connection: {}'.format(ctx_info))
                         amqp_client.close()
-                        logging.info('Connection closed successfully')
+                        logger.info('Connection closed successfully for {}'.format(ctx_info))
                     except:
-                        logging.exception('Failed closing connection')
+                        logger.exception('Failed closing connection for {}'.format(ctx_info))
                     del logs.clients.amqp_client
             if ctx.operation._operation_retry:
                 raise ctx.operation._operation_retry
