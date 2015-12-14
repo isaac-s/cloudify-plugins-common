@@ -49,6 +49,7 @@ CLOUDIFY_CONTEXT_IDENTIFIER = '__cloudify_context'
 
 logger = logging.getLogger(__name__)
 
+
 def _is_cloudify_context(obj):
     """
     Gets whether the provided obj is a CloudifyContext instance.
@@ -187,21 +188,25 @@ def operation(func=None, **arguments):
                         ctx_instances_desc = 'node-instance={}'.format(
                             ctx.instance.id)
                     elif ctx.type == context.RELATIONSHIP_INSTANCE:
-                        ctx_instances_desc = 'source-instance={}, target-instance={}'.format(
+                        ctx_instances_desc = 'source-instance={}, '
+                        'target-instance={}'.format(
                             ctx.source.instance.id,
                             ctx.target.instance.id)
                     else:
-                        ctx_instance_desc='<no instance information>'
+                        ctx_instances_desc = '<no instance information>'
 
                     ctx_info = 'operation={}, {}'.format(
-                        ctx.operation.name, ctx_instance_desc)
+                        ctx.operation.name, ctx_instances_desc)
 
                     try:
-                        logger.info('Closing AMQP connection: {}'.format(ctx_info))
+                        logger.info('Closing AMQP connection: {}'
+                                    .format(ctx_info))
                         amqp_client.close()
-                        logger.info('Connection closed successfully for {}'.format(ctx_info))
+                        logger.info('Connection closed successfully for {}'
+                                    .format(ctx_info))
                     except:
-                        logger.exception('Failed closing connection for {}'.format(ctx_info))
+                        logger.exception('Failed closing connection for {}'
+                                         .format(ctx_info))
                     del logs.clients.amqp_client
             if ctx.operation._operation_retry:
                 raise ctx.operation._operation_retry
