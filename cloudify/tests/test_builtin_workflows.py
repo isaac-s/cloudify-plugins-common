@@ -82,6 +82,27 @@ class TestExecuteOperationWorkflow(testtools.TestCase):
         # 'allow_kwargs_override' parameter (null/None)
         self._test_exec_op_with_params_and_no_kwargs_override(cfy_local, None)
 
+    @workflow_test(execute_blueprint_path)
+    def test_execute_operation_with_deprecated_conflict(self,
+                                                        cfy_local):
+        try:
+            cfy_local.execute('execute_operation', self._get_params(
+                op_params={'a': 'b'},
+                op_inputs={'a': 'b'}))
+            self.fail('expected failure due to specifying both deprecated '
+                      'and new params')
+        except RuntimeError, e:
+            pass
+
+        try:
+            cfy_local.execute('execute_operation', self._get_params(
+                allow_inputs_override=True,
+                allow_kw_override=True))
+            self.fail('expected failure due to specifying both deprecated '
+                      'and new params')
+        except RuntimeError, e:
+            pass
+
     def _test_exec_op_with_params_and_no_kwargs_override(self, cfy_local,
                                                          kw_over_val):
         try:
@@ -312,7 +333,8 @@ class TestExecuteOperationWorkflow(testtools.TestCase):
     def _get_params(self, op='cloudify.interfaces.lifecycle.create',
                     op_params=None, run_by_dep=False,
                     allow_kw_override=None, node_ids=None,
-                    node_instance_ids=None, type_names=None):
+                    node_instance_ids=None, type_names=None,
+                    op_inputs=None, allow_inputs_override=None):
         return {
             'operation': op,
             'operation_kwargs': op_params or {},
@@ -320,7 +342,9 @@ class TestExecuteOperationWorkflow(testtools.TestCase):
             'allow_kwargs_override': allow_kw_override,
             'node_ids': node_ids or [],
             'node_instance_ids': node_instance_ids or [],
-            'type_names': type_names or []
+            'type_names': type_names or [],
+            'operation_inputs': op_inputs or {},
+            'allow_inputs_override': allow_inputs_override
         }
 
 

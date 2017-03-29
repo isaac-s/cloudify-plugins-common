@@ -334,9 +334,32 @@ def install_new_agents(ctx, install_agent_timeout, node_ids,
 
 @workflow
 def execute_operation(ctx, operation, operation_kwargs, allow_kwargs_override,
+                      operation_inputs, allow_inputs_override,
                       run_by_dependency_order, type_names, node_ids,
                       node_instance_ids, **kwargs):
     """ A generic workflow for executing arbitrary operations on nodes """
+
+    if operation_kwargs:
+        if operation_inputs:
+            raise RuntimeError("'operation_kwargs' and 'operation_inputs' must "
+                               "not be specified together")
+
+        ctx.logger.warn("'operation_kwargs' is deprecated; please use "
+                        "'operation_inputs' instead")
+
+    if allow_kwargs_override:
+        if allow_inputs_override:
+            raise RuntimeError("'allow_kwargs_override' and "
+                               "'allow_inputs_override' must not be specified "
+                               "together")
+
+        ctx.logger.warn("'allow_kwargs_override' is deprecated; please use "
+                        "'allow_inputs_override' instead")
+
+    # operation_kwargs and operation_inputs must not be provided together.
+
+    effective_operation_kwargs = operation_inputs or operation_kwargs
+    effective_allow_kwargs_override = allow_inputs_override or allow_kwargs_override
 
     graph = ctx.graph_mode()
     subgraphs = {}
@@ -370,18 +393,18 @@ def execute_operation(ctx, operation, operation_kwargs, allow_kwargs_override,
 
     # preparing the parameters to the execute_operation call
     exec_op_params = {
-        'kwargs': operation_kwargs,
+        'kwargs': effective_operation_kwargs,
         'operation': operation
     }
     if allow_kwargs_override is not None:
-        exec_op_params['allow_kwargs_override'] = allow_kwargs_override
+        exec_op_params['allow_kwargs_override'] = effective_allow_kwargs_override
 
     # registering actual tasks to sequences
     for instance in filtered_node_instances:
         start_event_message = 'Starting operation {0}'.format(operation)
-        if operation_kwargs:
+        if effective_operation_kwargs:
             start_event_message += ' (Operation parameters: {0})'.format(
-                operation_kwargs)
+                effective_operation_kwargs)
         subgraph = graph.subgraph(instance.id)
         sequence = subgraph.sequence()
         sequence.add(
