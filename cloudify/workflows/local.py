@@ -14,6 +14,7 @@
 #    * limitations under the License.
 
 import os
+import stat
 import tempfile
 import copy
 import importlib
@@ -528,6 +529,21 @@ class FileStorage(_Storage):
             return names if os.path.abspath(self.resources_root) == src \
                 else set()
         shutil.copytree(resources_root, self.resources_root, ignore=ignore)
+
+        # CFY-6724: source directory may be non-writable. shutil.copytree
+        # copies permissions as well. We need the target to be writable,
+        # otherwise it'd be impossible to re-init.
+        def set_user_write(path):
+            curr_stat = os.stat(path)
+            os.chmod(path, curr_stat.st_mode | stat.S_IWUSR)
+
+        set_user_write(self.resources_root)
+        for root, dirs, files in os.walk(self.resources_root):
+            for dir in dirs:
+                set_user_write(os.path.join(root, dir))
+            for file in files:
+                set_user_write(os.path.join(root, file))
+
         self._instances_dir = instances_dir
         for instance in node_instances:
             self._store_instance(instance, lock=False)
