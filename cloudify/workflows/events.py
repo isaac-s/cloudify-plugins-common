@@ -16,6 +16,7 @@
 
 from cloudify import logs
 from cloudify.exceptions import OperationRetry
+from cloudify.celery.app import get_celery_app
 from cloudify.workflows import tasks as tasks_api
 
 
@@ -65,10 +66,12 @@ class Monitor(object):
                                 event)
             task.set_state(state)
 
-    def capture(self):
-        # Only called when running within an agent, so import here
-        from cloudify_agent.app import app
+    def capture(self, tenant=None):
+        app = get_celery_app(tenant=tenant)
+
         with app.connection() as connection:
+            if self._should_stop:
+                return
             self._receiver = app.events.Receiver(connection, handlers={
                 'task-sent': self.task_sent,
                 'task-received': self.task_received,
@@ -78,15 +81,12 @@ class Monitor(object):
                 'task-revoked': self.task_revoked,
                 'task-retried': self.task_retried
             })
-            for _ in self._receiver.itercapture(limit=None,
-                                                timeout=None,
-                                                wakeup=True):
-                if self._should_stop:
-                    return
+            self._receiver.capture(limit=None, timeout=None, wakeup=True)
 
     def stop(self):
         self._should_stop = True
-        self._receiver.should_stop = True
+        if self._receiver is not None:
+            self._receiver.should_stop = True
 
 
 def send_task_event_func_remote(task, event_type, message,
